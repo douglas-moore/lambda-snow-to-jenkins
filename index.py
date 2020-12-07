@@ -1,6 +1,6 @@
 import requests
 import json
-# import boto3
+import boto3
 import os
 import re
 from requests.auth import HTTPBasicAuth
@@ -116,16 +116,14 @@ def lambda_handler(event, context):
     
     # convert dict to json string by json.dumps() for body data. 
 
-    # os.environ['USER'] for Lambda, getenv('USER') for local server
+    # os.environ['USER'] for Lambda, os.getenv('USER') for local server
     # USER = os.environ['USER'] # Lambda
     USER = os.getenv("USER")
     # PASSWORD = os.environ["PASSWORD"] # Lambda
     PASSWORD = os.getenv("PASSWORD")
-    print(USER)
-    print(PASSWORD)
 
-    print("trying requests | ENV VARS =", user, password)
-    # resp = requests.get(url4, headers=headers, auth=HTTPBasicAuth(user, password))
+    print("trying requests | ENV VARS =", USER, PASSWORD)
+    # resp = requests.get(url4, headers=headers, auth=HTTPBasicAuth(USER, PASSWORD))
     print("requests succeeded?")
     # return -1 
     
