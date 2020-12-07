@@ -117,22 +117,27 @@ def lambda_handler(event, context):
     # convert dict to json string by json.dumps() for body data. 
 
     # os.environ['USER'] for Lambda, os.getenv('USER') for local server
-    # USER = os.environ['USER'] # Lambda
+
+    # === Local Environment Variables ===
     USER = os.getenv("USER")
-    # PASSWORD = os.environ["PASSWORD"] # Lambda
     PASSWORD = os.getenv("PASSWORD")
 
+    # === Lambda Environment Variables ===
+    # USER = os.environ['USER']
+    # PASSWORD = os.environ["PASSWORD"]
+
     print("trying requests | ENV VARS =", USER, PASSWORD)
-    # resp = requests.get(url4, headers=headers, auth=HTTPBasicAuth(USER, PASSWORD))
+    resp = requests.get(url4, headers=headers, auth=HTTPBasicAuth(USER, PASSWORD))
     print("requests succeeded?")
+    print(resp)
     # return -1 
     
     
-    sns = boto3.client('sns')
-    dynamodb = boto3.client('dynamodb')
+    # sns = boto3.client('sns')
+    # dynamodb = boto3.client('dynamodb')
     
-    test_build_parameters = ['Clone of test to prod\u200bCS0722732', [['env/10004_elevate_us_pretest.groovy', 'env/10004_elevate_us_cloudopstest.groovy', '04/12/2020', '01', '24', 'AM', 'GMT']]]
-    dynamodb.put_item(TableName='clone-schedule', Item={'caseID':{'S':test_build_parameters[0]}, 'build_info':{tuple(test_build_parameters[1:])}})
+    # test_build_parameters = ['Clone of test to prod\u200bCS0722732', [['env/10004_elevate_us_pretest.groovy', 'env/10004_elevate_us_cloudopstest.groovy', '04/12/2020', '01', '24', 'AM', 'GMT']]]
+    # dynamodb.put_item(TableName='clone-schedule', Item={'caseID':{'S':test_build_parameters[0]}, 'build_info':{tuple(test_build_parameters[1:])}})
     
     return 1
     
