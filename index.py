@@ -9,7 +9,6 @@ from requests.auth import HTTPBasicAuth
 from dotenv import load_dotenv 
 load_dotenv()
 
-
 def get_groovy_file(region, product, env):
     if region == "us" or region == "can":
         if product == "elevate":
@@ -117,9 +116,13 @@ def lambda_handler(event, context):
     
     # convert dict to json string by json.dumps() for body data. 
 
-    # environ for Lambda, getenv for local server
-    user = os.getenv['USER']
-    password = os.getenv['PASSWORD']
+    # os.environ['USER'] for Lambda, getenv('USER') for local server
+    # USER = os.environ['USER'] # Lambda
+    USER = os.getenv("USER")
+    # PASSWORD = os.environ["PASSWORD"] # Lambda
+    PASSWORD = os.getenv("PASSWORD")
+    print(USER)
+    print(PASSWORD)
 
     print("trying requests | ENV VARS =", user, password)
     # resp = requests.get(url4, headers=headers, auth=HTTPBasicAuth(user, password))
@@ -173,3 +176,4 @@ def lambda_handler(event, context):
         print("Unable to query SNOW")
     
     return 1
+lambda_handler(None, None)
