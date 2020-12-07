@@ -126,20 +126,22 @@ def lambda_handler(event, context):
     # USER = os.environ['USER']
     # PASSWORD = os.environ["PASSWORD"]
 
-    print("trying requests | ENV VARS =", USER, PASSWORD)
+    if USER == None or PASSWORD == None:
+        print('You need to configure the username and password environment variables')
+        return -1
+
+    print("trying requests")
     resp = requests.get(url4, headers=headers, auth=HTTPBasicAuth(USER, PASSWORD))
-    print("requests succeeded?")
-    print(resp)
+    # print("requests succeeded?")
     # return -1 
     
-    
-    # sns = boto3.client('sns')
-    # dynamodb = boto3.client('dynamodb')
+    sns = boto3.client('sns')
+    dynamodb = boto3.client('dynamodb')
     
     # test_build_parameters = ['Clone of test to prod\u200bCS0722732', [['env/10004_elevate_us_pretest.groovy', 'env/10004_elevate_us_cloudopstest.groovy', '04/12/2020', '01', '24', 'AM', 'GMT']]]
     # dynamodb.put_item(TableName='clone-schedule', Item={'caseID':{'S':test_build_parameters[0]}, 'build_info':{tuple(test_build_parameters[1:])}})
     
-    return 1
+    # return 1
     
     build_parameters_list = []
         
@@ -179,4 +181,6 @@ def lambda_handler(event, context):
         print("Unable to query SNOW")
     
     return 1
+
+# Local Devlopment
 lambda_handler(None, None)
