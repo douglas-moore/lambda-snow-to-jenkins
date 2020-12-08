@@ -1,8 +1,10 @@
 import requests
 import json
-import boto3
+# import boto3
 import os
 import re
+from datetime import datetime
+from dateutil import tz
 from requests.auth import HTTPBasicAuth
 
 # === Loading Local Environment Variables ===
@@ -44,7 +46,7 @@ def get_groovy_file(region, product, env):
         groovy = "Error: no appropriate groovy found. Unknown region " + region + ". Verify URL is correct."
     return groovy
 
-def get_build_data(description):
+def get_build_data(case, description):
     # capture groups: 0. region, 1. product, 2. environment, 3. type, 4. client
     # use 10004 accounts for now
     # us pretest and cloudops test
@@ -54,15 +56,9 @@ def get_build_data(description):
     url_matches = re.findall(url_pattern, description)
 
     # capture groups: 0. date
-    date_regex = r'(?:[0-9]{2}/){2}[0-9]{4}'
-    date_pattern = re.compile(date_regex)
-    date_matches = re.findall(date_pattern, description)
-
-    # capture groups: 0. hours, 1. minutes, 2. AM or PM (all capitalization variants), 3. time zone
-    # expected start date
-    time_regex = r'([0-9]{1,2}):([0-9]{2})\s*?([AaPp][Mm])\s*?([a-zA-Z]{2}[tT])'
-    time_pattern = re.compile(time_regex)
-    time_matches = re.findall(time_pattern, description)
+    date_time_regex = r'[0-9]{4}-[0-9]{1,2}-[0-9]{1,2} [0-9]{1,2}:[0-9]{2}'
+    date_time_pattern = re.compile(date_time_regex)
+    date_time_matches = re.findall(date_time_pattern, description)
 
     build_data_list = []
 
@@ -85,27 +81,37 @@ def get_build_data(description):
         return "Error: Will not build. Export and import must have the same client in their urls."
 
     try: 
-        date = date_matches[0]
+        date_time = date_time_matches[0]
     except IndexError:
-        return "Error: Will not build. Date not formatted correctly"
+        return "Error: Will not build. Date and time not formatted correctly: YYYY-MM-DD HH:MM. All times must be in UTC and 24-hour."
 
-    try: 
-        time_hours = time_matches[0][0]
-        time_minutes = time_matches[0][1]
-        am_or_pm = time_matches[0][2]
-        time_zone = time_matches[0][3]
-    except IndexError:
-        return "Error: Will not build. Time not formatted correctly"
-
-        export_groovy_file = get_groovy_file(from_region, from_product, from_env)
+    export_groovy_file = get_groovy_file(from_region, from_product, from_env)
     import_groovy_file = get_groovy_file(to_region, to_product, to_env)
 
     if "Error" not in (export_groovy_file or import_groovy_file): 
-        build_data_list.append([export_groovy_file, import_groovy_file, date, time_hours, time_minutes, am_or_pm, time_zone])
+        build_data_list = [case, export_groovy_file, import_groovy_file, date_time]
     else: 
         return ("Error: Groovy file error. Export: " + export_groovy_file + "\nImport: " + import_groovy_file) 
 
     return build_data_list
+
+def time_to_run(date_string):
+    # item_in_table = dynamodb.get_item(TableName='clone-schedule', Key={'caseID':{'S':build_parameters_list[0]}})
+    from_zone = tz.tzutc()
+    to_zone = tz.tzlocal()
+    naive_date_time_obj = datetime.strptime(date_string, '%Y-%m-%d %H:%M')
+    utc_date_time = naive_date_time_obj.replace(tzinfo=from_zone)
+    local = utc_date_time.astimezone(to_zone)
+    now = datetime.now()
+    now_with_tz = now.replace(tzinfo=to_zone)
+    difference = local - now_with_tz
+    difference_in_seconds = difference.total_seconds() 
+    difference_in_minutes = divmod(difference_in_seconds, 60)[0]  
+
+    if abs(difference_in_minutes) < 10:
+        return True 
+
+    return False 
 
 def lambda_handler(event, context):
     # url = 'https://elluciandev.service-now.com/api/sn_customerservice/case/CS0722732'
@@ -128,8 +134,8 @@ def lambda_handler(event, context):
 
     print("trying requests | ENV VARS =", USER, PASSWORD)
     resp = requests.get(url4, headers=headers, auth=HTTPBasicAuth(USER, PASSWORD))
-    print("requests succeeded?")
-    print(resp)
+    # print("requests succeeded?")
+    # print(resp)
     # return -1 
     
     
@@ -139,7 +145,7 @@ def lambda_handler(event, context):
     # test_build_parameters = ['Clone of test to prod\u200bCS0722732', [['env/10004_elevate_us_pretest.groovy', 'env/10004_elevate_us_cloudopstest.groovy', '04/12/2020', '01', '24', 'AM', 'GMT']]]
     # dynamodb.put_item(TableName='clone-schedule', Item={'caseID':{'S':test_build_parameters[0]}, 'build_info':{tuple(test_build_parameters[1:])}})
     
-    return 1
+    # return 1
     
     build_parameters_list = []
         
@@ -151,32 +157,31 @@ def lambda_handler(event, context):
             for case in case_list:
                 for key, value in case.items():
                     if key == "case":
-                        print("case is : ", case)
-                        build_parameters_list.append(value)
+                        case = value
                     if key == "description":
                         # in current test, no time in description, need to add it for clarity
                         new_description = value + " 01:24 AM GMT"
-                        build_parameters = get_build_data(new_description)
-                        print("build parameters")
-                        print(build_parameters)
+                        build_parameters = get_build_data(case, new_description)
                         if "Error" not in build_parameters: 
                             build_parameters_list.append(build_parameters)
                             # item_in_table = dynamodb.get_item(TableName='clone-schedule', Key={'caseID':{'S':build_parameters_list[0]}})
                             # print("item in table")
                             # print(item_in_table)
                             # if not item_in_table: 
-                            dynamodb.put_item(TableName='clone-schedule', Item={'caseID':{'S':build_parameters_list[0]}, 'build_info':{tuple(build_parameters_list[1:])}})
+                            # dynamodb.put_item(TableName='clone-schedule', Item={'caseID':{'S':build_parameters_list[0]}, 'build_info':{tuple(build_parameters_list[1:])}})
                             # else:
                             #     return "Item in table already."
+                            print('filling in if statement')
                         else: 
-                            response = sns.publish(
-                                TopicArn='arn:aws:sns:us-east-1:475064013001:snow-auto',    
-                                Message=build_parameters,    
-                            )
+                            # response = sns.publish(
+                            #     TopicArn='arn:aws:sns:us-east-1:475064013001:snow-auto',    
+                            #     Message=build_parameters,    
+                            # )
                             
                             return -1
     else:
         print("Unable to query SNOW")
     
     return 1
+
 lambda_handler(None, None)
